@@ -1,0 +1,14 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    <div>
+        <label for="id_xlsx_file">xlsx file</label>
+        <input id="id_xlsx_file" type="file" name="xlsx_file" accept=".xlsx" required>
+    </div>
+    <div class="submit-row">
+        <input type="submit" value="import">
+    </div>
+</form>
+{% endblock %}

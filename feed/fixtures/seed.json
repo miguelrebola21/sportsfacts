@@ -1,0 +1,39 @@
+[
+  {
+    "model": "feed.tag",
+    "pk": 1,
+    "fields": {
+      "name": "basketball"
+    }
+  },
+  {
+    "model": "feed.tag",
+    "pk": 2,
+    "fields": {
+      "name": "football"
+    }
+  },
+  {
+    "model": "feed.fact",
+    "pk": 1,
+    "fields": {
+      "text": "Blgvaskjfadksfa",
+      "tags": [1],
+      "upvotes": 0,
+      "downvotes": 0,
+      "created_at": "2026-06-23T00:00:00Z"
+    }
+  },
+  {
+    "model": "feed.record",
+    "pk": 1,
+    "fields": {
+      "number": 232,
+      "text": "dlkaflasdklfkdasf",
+      "tags": [2],
+      "upvotes": 0,
+      "downvotes": 0,
+      "created_at": "2026-06-23T00:00:00Z"
+    }
+  }
+]

@@ -1,0 +1,236 @@
+<!doctype html>
+{% load static %}
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SPORTSFACTS</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background: #002030;
+            color: #10212b;
+            font-family: Arial, sans-serif;
+        }
+
+        header {
+            width: min(760px, calc(100% - 32px));
+            margin: 0 auto;
+            padding: 48px 0 0;
+            margin-bottom: 32px;
+        }
+
+        .logo {
+            display: block;
+            width:  min(100%, 625px);
+            height: auto;
+            margin: 0 auto;
+            image-rendering: pixelated;
+        }
+
+        main {
+            max-width: 580px;
+            width: calc(100% - 32px);
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            padding: 34px 0 56px;
+        }
+
+        .card {
+            border: 6px dashed #002030;
+            padding: 20px 24px;
+            line-height: 1.35;
+        }
+
+        .fact-card {
+            background: #f6fbff;
+        }
+
+        .record-card {
+            background: #fff7f7;
+        }
+
+        .card-title {
+            color: #002030;
+            font-size: 22px;
+            font-weight: 700;
+            margin: 0 0 8px;
+        }
+
+        .record-card .card-title {
+            color: #a71e1e;
+        }
+
+        .card-body {
+            font-size: 20px;
+            margin: 0;
+        }
+
+        .tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .tag,
+        .tag-link {
+            display: inline-flex;
+            align-items: center;
+            border: 1px solid #c8d4da;
+            border-radius: 999px;
+            color: #33505d;
+            font-size: 13px;
+            padding: 4px 10px;
+            text-decoration: none;
+        }
+
+        .tag-link.active {
+            background: #002030;
+            border-color: #002030;
+            color: #ffffff;
+        }
+
+        .selected-tag-pills {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            padding: 8px 0;
+        }
+
+        .selected-tag-pills .tag-link {
+            justify-content: space-between;
+            background: #ffffff;
+            border-color: #ffffff;
+            color: #002030;
+            min-width: 100px;
+            padding: 7px 12px;
+        }
+
+        .tag-remove {
+            font-size: 16px;
+            font-weight: 700;
+            line-height: 1;
+            margin-left: 8px;
+        }
+
+        .actions {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 10px;
+            margin-top: 16px;
+            font-size: 14px;
+        }
+
+        .icon-button,
+        .share-link {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            border: 1px solid #c8d4da;
+            border-radius: 6px;
+            background: #f8fbfc;
+            color: #10212b;
+            cursor: pointer;
+            font: inherit;
+            padding: 7px 10px;
+            text-decoration: none;
+        }
+
+        .icon-button svg,
+        .share-link svg {
+            width: 18px;
+            height: 18px;
+            fill: none;
+            stroke: currentColor;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            stroke-width: 2;
+        }
+
+        .share-links {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-left: auto;
+        }
+
+        .count {
+            min-width: 1ch;
+        }
+    </style>
+</head>
+<body>
+<header>
+    <img class="logo" src="{% static 'feed/logo.svg' %}" alt="sportsfacts">
+</header>
+<main>
+    {% if selected_tags %}
+        <div class="selected-tag-pills">
+            {% for tag in selected_tags %}
+                <a class="tag-link" href="{{ tag.remove_url }}" aria-label="remove {{ tag.name }}">
+                    <span>{{ tag.name }}</span>
+                    <span class="tag-remove" aria-hidden="true">×</span>
+                </a>
+            {% endfor %}
+        </div>
+    {% endif %}
+    {% for card in cards %}
+        <article class="card {{ card.type }}-card">
+            <h2 class="card-title">{{ card.title }}</h2>
+            <p class="card-body">{{ card.body }}</p>
+            {% if card.tags %}
+                <div class="tags">
+                    {% for tag in card.tags %}
+                        <a class="tag-link{% if tag.active %} active{% endif %}" href="{{ tag.url }}">{{ tag.name }}</a>
+                    {% endfor %}
+                </div>
+            {% endif %}
+            <div class="actions">
+                <form method="post" action="{{ card.upvote_url }}">
+                    {% csrf_token %}
+                    <button class="icon-button" type="submit" aria-label="upvote" title="upvote">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>
+                        <span class="count">{{ card.upvotes }}</span>
+                    </button>
+                </form>
+                <form method="post" action="{{ card.downvote_url }}">
+                    {% csrf_token %}
+                    <button class="icon-button" type="submit" aria-label="downvote" title="downvote">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg>
+                        <span class="count">{{ card.downvotes }}</span>
+                    </button>
+                </form>
+                <div class="share-links">
+                    {% for label, url in card.share_links %}
+                        <a class="share-link" href="{{ url }}" target="_blank" rel="noopener" aria-label="share on {{ label }}" title="{{ label }}">
+                            {% if label == "x" %}
+                                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 5 14 14"/><path d="m19 5-14 14"/></svg>
+                            {% elif label == "facebook" %}
+                                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 8h3V4h-3c-3 0-5 2-5 5v3H6v4h3v4h4v-4h3l1-4h-4V9c0-1 .5-1 1-1Z"/></svg>
+                            {% elif label == "linkedin" %}
+                                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 10v9"/><path d="M6 6v.01"/><path d="M11 19v-9"/><path d="M11 14c0-3 5-4 5 0v5"/></svg>
+                            {% else %}
+                                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 9c1 4 3 6 7 7l2-2 3 1c-1 3-3 4-6 3-4-1-7-4-8-8-1-3 0-5 3-6l1 3-2 2Z"/></svg>
+                            {% endif %}
+                        </a>
+                    {% endfor %}
+                    <a class="share-link" href="{{ card.image_url }}" aria-label="share image" title="image">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2"/><path d="m8 15 3-3 3 3 2-2 3 3"/></svg>
+                    </a>
+                </div>
+            </div>
+        </article>
+    {% endfor %}
+</main>
+</body>
+</html>

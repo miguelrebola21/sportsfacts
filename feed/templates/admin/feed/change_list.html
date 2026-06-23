@@ -1,0 +1,9 @@
+{% extends "admin/change_list.html" %}
+
+{% block object-tools-items %}
+    <li><a href="{{ global_xlsx_import_url }}">global import xlsx</a></li>
+    <li><a href="{{ global_xlsx_export_url }}">global export xlsx</a></li>
+    <li><a href="{{ xlsx_import_url }}">import xlsx</a></li>
+    <li><a href="{{ xlsx_export_url }}">export xlsx</a></li>
+    {{ block.super }}
+{% endblock %}
