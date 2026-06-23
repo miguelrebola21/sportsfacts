@@ -121,15 +121,49 @@ class FeedViewTests(TestCase):
         self.assertEqual(record.downvotes, 1)
 
     def test_share_image_returns_png(self):
-        fact = Fact.objects.create(text="hgHGFADHGFHS")
+        tag = Tag.objects.create(name="scoring")
+        fact = Fact.objects.create(text="A touchdown in American football is worth six points.", upvotes=18, downvotes=8)
+        fact.tags.add(tag)
 
         response = self.client.get(reverse("feed:share_image", args=["fact", fact.id]))
 
         self.assertEqual(response["Content-Type"], "image/png")
         self.assertTrue(response.content.startswith(b"\x89PNG"))
         image = Image.open(BytesIO(response.content))
-        self.assertEqual(image.size, (1200, 630))
+        self.assertEqual(image.size, (2400, 1260))
         self.assertEqual(image.getpixel((0, 0)), (0, 32, 48))
+        self.assertEqual(image.getpixel((400, 120)), (255, 255, 255))
+        self.assertEqual(image.getpixel((220, 720)), (246, 251, 255))
+        self.assertEqual(image.getpixel((1200, 980)), (246, 251, 255))
+        self.assertEqual(image.getpixel((1200, 760)), (246, 251, 255))
+
+    def test_record_share_image_uses_record_card_style(self):
+        tag = Tag.objects.create(name="world record")
+        record = Record.objects.create(number=11, text="Galina Chistyakova jumped 7.52 meters in the women's long jump in 1988.", upvotes=85, downvotes=3)
+        record.tags.add(tag)
+
+        response = self.client.get(reverse("feed:share_image", args=["record", record.id]))
+
+        image = Image.open(BytesIO(response.content))
+        self.assertEqual(image.size, (2400, 1260))
+        self.assertEqual(image.getpixel((0, 0)), (0, 32, 48))
+        self.assertEqual(image.getpixel((400, 120)), (255, 255, 255))
+        self.assertEqual(image.getpixel((160, 680)), (255, 247, 247))
+        self.assertEqual(image.getpixel((360, 980)), (255, 247, 247))
+        self.assertEqual(image.getpixel((1200, 680)), (255, 247, 247))
+
+    def test_share_image_card_grows_for_long_text(self):
+        fact = Fact.objects.create(
+            text=(
+                "Soccer fact #22: This is a real-style sports fact placeholder to be replaced with enough "
+                "text to wrap into several lines while keeping padding inside the generated share card."
+            )
+        )
+
+        response = self.client.get(reverse("feed:share_image", args=["fact", fact.id]))
+
+        image = Image.open(BytesIO(response.content))
+        self.assertEqual(image.getpixel((360, 1180)), (246, 251, 255))
 
     def test_share_page_has_social_image_metadata(self):
         fact = Fact.objects.create(text="share fact")

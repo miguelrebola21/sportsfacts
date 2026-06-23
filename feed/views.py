@@ -1,6 +1,5 @@
 from io import BytesIO
 import random
-import textwrap
 from urllib.parse import quote, urlencode
 
 from django.db.models import F
@@ -76,23 +75,12 @@ def vote(request, item_type, item_id, direction):
 def share_image(request, item_type, item_id):
     item = _get_item(item_type, item_id)
     title, body = _display_parts(item_type, item)
-    background = "#002030" if item_type == "fact" else "#9f1d1d"
-    image = Image.new("RGB", (1200, 630), background)
+    scale = 2
+    image = Image.new("RGB", (1200 * scale, 630 * scale), "#002030")
     draw = ImageDraw.Draw(image)
-    title_font = ImageFont.load_default(size=64)
-    body_font = ImageFont.load_default(size=54)
 
-    _draw_pixel_logo(draw, image.width, 54)
-
-    lines = [title] + textwrap.wrap(body, width=32)
-    line_height = 70
-    total_height = line_height * len(lines)
-    y = (image.height - total_height) // 2 + 45
-
-    for index, line in enumerate(lines):
-        font = title_font if index == 0 else body_font
-        _draw_centered_text(draw, line, y, font, "#ffffff", image.width)
-        y += line_height
+    _draw_pixel_logo(draw, image.width, 54 * scale, scale)
+    _draw_share_card(draw, item_type, title, body, scale)
 
     output = BytesIO()
     image.save(output, format="PNG")
@@ -205,16 +193,102 @@ def _display_parts(item_type, item):
     return f"Record #{item.number}", item.text
 
 
-def _draw_centered_text(draw, text, y, font, fill, width, x_offset=0):
+def _draw_share_card(draw, item_type, title, body, scale=1):
+    card_color = "#f6fbff" if item_type == "fact" else "#fff7f7"
+    title_color = "#002030" if item_type == "fact" else "#a71e1e"
+    text_color = "#10212b"
+    border_color = "#002030"
+    card_width = 1088 * scale
+    padding_x = 60 * scale
+    padding_y = 54 * scale
+    title_font = _font(42 * scale, bold=True)
+    body_font = _font(40 * scale)
+    body_line_height = 54 * scale
+    title_gap = 36 * scale
+    max_text_width = card_width - (padding_x * 2)
+    body_lines = _wrap_text(draw, body, body_font, max_text_width)
+    title_height = _text_height(draw, title, title_font)
+    body_height = body_line_height * len(body_lines)
+    card_height = padding_y + title_height + title_gap + body_height + padding_y
+    box = _share_card_box(card_width, card_height, scale)
+    left, top, right, bottom = box
+
+    draw.rectangle(box, fill=card_color)
+    _draw_jagged_edge(draw, box, border_color)
+
+    x = left + padding_x
+    y = top + padding_y
+
+    draw.text((x, y), title, fill=title_color, font=title_font)
+    y += title_height + title_gap
+
+    for line in body_lines:
+        draw.text((x, y), line, fill=text_color, font=body_font)
+        y += body_line_height
+
+
+def _share_card_box(width, height, scale=1):
+    left = ((1200 * scale) - width) // 2
+    lower_top = 300 * scale
+    lower_bottom = 612 * scale
+    lower_height = lower_bottom - lower_top
+    top = lower_top + max((lower_height - height) // 2, 0)
+    return (left, top, left + width, top + height)
+
+
+def _wrap_text(draw, text, font, max_width):
+    lines = []
+    current = ""
+    for word in text.split():
+        candidate = f"{current} {word}".strip()
+        if current and _text_width(draw, candidate, font) > max_width:
+            lines.append(current)
+            current = word
+        else:
+            current = candidate
+    if current:
+        lines.append(current)
+    return lines or [""]
+
+
+def _text_width(draw, text, font):
     box = draw.textbbox((0, 0), text, font=font)
-    x = (width - (box[2] - box[0])) // 2 + x_offset
-    draw.text((x, y), text, fill=fill, font=font)
+    return box[2] - box[0]
 
 
-def _draw_pixel_logo(draw, canvas_width, y):
-    cell = 13
-    letter_gap = 8
-    word_gap = 32
+def _text_height(draw, text, font):
+    box = draw.textbbox((0, 0), text, font=font)
+    return box[3] - box[1]
+
+
+def _draw_jagged_edge(draw, box, color):
+    left, top, right, bottom = box
+    notch = 12
+    step = 34
+
+    for x in range(left, right, step):
+        draw.rectangle((x, top, x + notch, top + notch), fill=color)
+        draw.rectangle((x, bottom - notch, x + notch, bottom), fill=color)
+
+    for y in range(top, bottom, step):
+        draw.rectangle((left, y, left + notch, y + notch), fill=color)
+        draw.rectangle((right - notch, y, right, y + notch), fill=color)
+
+
+def _font(size, bold=False):
+    names = ("Arial Bold.ttf", "Arial.ttf") if bold else ("Arial.ttf",)
+    for name in names:
+        try:
+            return ImageFont.truetype(name, size=size)
+        except OSError:
+            continue
+    return ImageFont.load_default(size=size)
+
+
+def _draw_pixel_logo(draw, canvas_width, y, scale=1):
+    cell = 13 * scale
+    letter_gap = 8 * scale
+    word_gap = 32 * scale
     text = "sportsfacts"
     total_width = (len(text) * 5 * cell) + ((len(text) - 2) * letter_gap) + word_gap
     x = (canvas_width - total_width) // 2
