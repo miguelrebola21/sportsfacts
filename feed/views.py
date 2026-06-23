@@ -1,4 +1,5 @@
 from io import BytesIO
+import random
 import textwrap
 from urllib.parse import quote, urlencode
 
@@ -24,21 +25,24 @@ PIXEL_LETTERS = {
 
 def home(request):
     selected_tag_names = _selected_tag_names(request)
-    facts = Fact.objects.prefetch_related("tags")
-    records = Record.objects.prefetch_related("tags")
+    facts = Fact.objects.select_related("invalidates").prefetch_related("tags")
+    records = Record.objects.select_related("invalidates").prefetch_related("tags")
     selected_tags = list(Tag.objects.filter(name__in=selected_tag_names))
     selected_tag_names = [tag.name for tag in selected_tags]
-    cards = []
+    fact_cards = []
+    record_cards = []
 
-    if selected_tags:
-        facts = facts.filter(tags__in=selected_tags).distinct()
-        records = records.filter(tags__in=selected_tags).distinct()
+    for tag in selected_tags:
+        facts = facts.filter(tags=tag)
+        records = records.filter(tags=tag)
 
     for fact in facts:
-        cards.append(_card_context(request, "fact", fact, fact.id, f"Fact #{fact.id}", fact.text, selected_tag_names))
+        fact_cards.append(_card_context(request, "fact", fact, fact.id, f"Fact #{fact.id}", fact.text, selected_tag_names))
 
     for record in records:
-        cards.append(_card_context(request, "record", record, record.id, f"Record #{record.number}", record.text, selected_tag_names))
+        record_cards.append(_card_context(request, "record", record, record.id, f"Record #{record.number}", record.text, selected_tag_names))
+
+    cards = _interleaved_cards(fact_cards, record_cards)
 
     return render(
         request,
@@ -95,9 +99,28 @@ def share_image(request, item_type, item_id):
     return HttpResponse(output.getvalue(), content_type="image/png")
 
 
+def share(request, item_type, item_id):
+    item = _get_item(item_type, item_id)
+    title, body = _display_parts(item_type, item)
+    image_url = request.build_absolute_uri(reverse("feed:share_image", args=[item_type, item_id]))
+    page_url = request.build_absolute_uri(reverse("feed:share", args=[item_type, item_id]))
+
+    return render(
+        request,
+        "feed/share.html",
+        {
+            "title": title,
+            "body": body,
+            "image_url": image_url,
+            "page_url": page_url,
+        },
+    )
+
+
 def _card_context(request, item_type, item, item_id, title, body, selected_tag_names):
     image_url = request.build_absolute_uri(reverse("feed:share_image", args=[item_type, item_id]))
-    encoded_image_url = quote(image_url, safe="")
+    page_url = request.build_absolute_uri(reverse("feed:share", args=[item_type, item_id]))
+    encoded_page_url = quote(page_url, safe="")
     text = f"{title}\n{body}"
     encoded_text = quote(text, safe="")
 
@@ -106,6 +129,7 @@ def _card_context(request, item_type, item, item_id, title, body, selected_tag_n
         "id": item_id,
         "title": title,
         "body": body,
+        "invalidates": _invalidates_context(item_type, item.invalidates),
         "tags": [
             {
                 "name": tag.name,
@@ -120,11 +144,37 @@ def _card_context(request, item_type, item, item_id, title, body, selected_tag_n
         "downvote_url": reverse("feed:vote", args=[item_type, item_id, "down"]),
         "image_url": image_url,
         "share_links": [
-            ("x", f"https://twitter.com/intent/tweet?url={encoded_image_url}&text={encoded_text}"),
-            ("facebook", f"https://www.facebook.com/sharer/sharer.php?u={encoded_image_url}"),
-            ("linkedin", f"https://www.linkedin.com/sharing/share-offsite/?url={encoded_image_url}"),
-            ("whatsapp", f"https://wa.me/?text={encoded_text}%20{encoded_image_url}"),
+            ("x", f"https://twitter.com/intent/tweet?url={encoded_page_url}&text={encoded_text}"),
+            ("facebook", f"https://www.facebook.com/sharer/sharer.php?u={encoded_page_url}"),
+            ("linkedin", f"https://www.linkedin.com/sharing/share-offsite/?url={encoded_page_url}"),
+            ("whatsapp", f"https://wa.me/?text={encoded_text}%20{encoded_page_url}"),
         ],
+    }
+
+
+def _interleaved_cards(fact_cards, record_cards):
+    random.shuffle(fact_cards)
+    random.shuffle(record_cards)
+    cards = []
+    longest = max(len(fact_cards), len(record_cards))
+
+    for index in range(longest):
+        if index < len(fact_cards):
+            cards.append(fact_cards[index])
+        if index < len(record_cards):
+            cards.append(record_cards[index])
+
+    return cards
+
+
+def _invalidates_context(item_type, item):
+    if not item:
+        return None
+    title, body = _display_parts(item_type, item)
+    return {
+        "anchor": f"#{item_type}-{item.id}",
+        "title": title,
+        "body": body,
     }
 
 

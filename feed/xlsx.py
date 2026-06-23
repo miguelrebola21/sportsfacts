@@ -6,9 +6,13 @@ from .models import Fact, Record, Tag
 
 HEADERS = {
     Tag: ("name",),
-    Fact: ("id", "text", "tags", "upvotes", "downvotes"),
-    Record: ("id", "number", "text", "tags", "upvotes", "downvotes"),
+    Fact: ("id", "text", "tags", "invalidates_id", "upvotes", "downvotes"),
+    Record: ("id", "number", "text", "tags", "invalidates_id", "upvotes", "downvotes"),
 }
+
+
+class XlsxImportError(ValueError):
+    pass
 
 
 def export_global_xlsx():
@@ -62,13 +66,16 @@ def _write_model_sheet(sheet, model, queryset):
         if model is Tag:
             sheet.append([item.name])
         elif model is Fact:
-            sheet.append([item.id, item.text, _tag_names(item), item.upvotes, item.downvotes])
+            sheet.append([item.id, item.text, _tag_names(item), item.invalidates_id, item.upvotes, item.downvotes])
         elif model is Record:
-            sheet.append([item.id, item.number, item.text, _tag_names(item), item.upvotes, item.downvotes])
+            sheet.append([item.id, item.number, item.text, _tag_names(item), item.invalidates_id, item.upvotes, item.downvotes])
 
 
 def _import_sheet(model, sheet):
     headers = [str(value).strip().lower() for value in next(sheet.iter_rows(values_only=True))]
+    expected_headers = list(HEADERS[model])
+    if headers != expected_headers:
+        raise XlsxImportError(f"{sheet.title} sheet must have columns: {', '.join(expected_headers)}")
     imported = 0
 
     for values in sheet.iter_rows(min_row=2, values_only=True):
@@ -92,6 +99,7 @@ def _import_row(model, row):
         item_id = _int_or_none(row.get("id"))
         defaults = {
             "text": _text(row.get("text")),
+            "invalidates_id": _validated_invalidates_id(Fact, row.get("invalidates_id")),
             "upvotes": _int_or_zero(row.get("upvotes")),
             "downvotes": _int_or_zero(row.get("downvotes")),
         }
@@ -104,6 +112,7 @@ def _import_row(model, row):
         defaults = {
             "number": _int_or_zero(row.get("number")),
             "text": _text(row.get("text")),
+            "invalidates_id": _validated_invalidates_id(Record, row.get("invalidates_id")),
             "upvotes": _int_or_zero(row.get("upvotes")),
             "downvotes": _int_or_zero(row.get("downvotes")),
         }
@@ -126,6 +135,13 @@ def _get_tags(value):
     return tags
 
 
+def _validated_invalidates_id(model, value):
+    item_id = _int_or_none(value)
+    if item_id and not model.objects.filter(id=item_id).exists():
+        raise XlsxImportError(f"Invalid invalidates_id {item_id} for {model._meta.verbose_name}.")
+    return item_id
+
+
 def _tag_names(item):
     return ", ".join(item.tags.values_list("name", flat=True))
 
@@ -141,13 +157,19 @@ def _is_empty_row(row):
 def _int_or_none(value):
     if value in (None, ""):
         return None
-    return int(value)
+    try:
+        return int(value)
+    except (TypeError, ValueError) as exc:
+        raise XlsxImportError(f"Expected an integer, got {value!r}") from exc
 
 
 def _int_or_zero(value):
     if value in (None, ""):
         return 0
-    return int(value)
+    try:
+        return int(value)
+    except (TypeError, ValueError) as exc:
+        raise XlsxImportError(f"Expected an integer, got {value!r}") from exc
 
 
 def _text(value):

@@ -5,7 +5,7 @@ from django.shortcuts import redirect, render
 from django.urls import path
 
 from .models import Fact, Record, Tag
-from .xlsx import export_global_xlsx, export_xlsx, import_global_xlsx, import_xlsx
+from .xlsx import XlsxImportError, export_global_xlsx, export_xlsx, import_global_xlsx, import_xlsx
 
 
 def global_export_xlsx_view(request):
@@ -17,8 +17,13 @@ def global_export_xlsx_view(request):
 
 def global_import_xlsx_view(request):
     if request.method == "POST" and request.FILES.get("xlsx_file"):
-        result = import_global_xlsx(request.FILES["xlsx_file"])
-        messages.success(request, f"Imported {result['tags']} tags, {result['facts']} facts, {result['records']} records.")
+        try:
+            result = import_global_xlsx(request.FILES["xlsx_file"])
+        except XlsxImportError as exc:
+            messages.error(request, str(exc))
+            return redirect(request.path)
+        else:
+            messages.success(request, f"Imported {result['tags']} tags, {result['facts']} facts, {result['records']} records.")
         return redirect("../")
 
     return render(
@@ -73,7 +78,11 @@ class XlsxAdminMixin:
 
     def import_xlsx_view(self, request):
         if request.method == "POST" and request.FILES.get("xlsx_file"):
-            imported = import_xlsx(self.model, request.FILES["xlsx_file"])
+            try:
+                imported = import_xlsx(self.model, request.FILES["xlsx_file"])
+            except XlsxImportError as exc:
+                self.message_user(request, str(exc), messages.ERROR)
+                return redirect(request.path)
             self.message_user(request, f"Imported {imported} rows.", messages.SUCCESS)
             return redirect("..")
 
@@ -96,15 +105,17 @@ class TagAdmin(XlsxAdminMixin, admin.ModelAdmin):
 
 @admin.register(Fact)
 class FactAdmin(XlsxAdminMixin, admin.ModelAdmin):
-    list_display = ("id", "text", "upvotes", "downvotes", "created_at")
+    list_display = ("id", "text", "invalidates", "upvotes", "downvotes", "created_at")
     search_fields = ("text", "tags__name")
     list_filter = ("tags",)
     filter_horizontal = ("tags",)
+    raw_id_fields = ("invalidates",)
 
 
 @admin.register(Record)
 class RecordAdmin(XlsxAdminMixin, admin.ModelAdmin):
-    list_display = ("number", "text", "upvotes", "downvotes", "created_at")
+    list_display = ("number", "text", "invalidates", "upvotes", "downvotes", "created_at")
     search_fields = ("text", "tags__name")
     list_filter = ("tags",)
     filter_horizontal = ("tags",)
+    raw_id_fields = ("invalidates",)

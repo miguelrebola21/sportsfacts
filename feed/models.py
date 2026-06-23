@@ -14,6 +14,7 @@ class Tag(models.Model):
 class Fact(models.Model):
     text = models.TextField()
     tags = models.ManyToManyField(Tag, blank=True, related_name="facts")
+    invalidates = models.ForeignKey("self", blank=True, null=True, on_delete=models.SET_NULL, related_name="invalidated_by")
     upvotes = models.PositiveIntegerField(default=0)
     downvotes = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -29,6 +30,7 @@ class Record(models.Model):
     number = models.PositiveIntegerField(unique=True)
     text = models.TextField()
     tags = models.ManyToManyField(Tag, blank=True, related_name="records")
+    invalidates = models.ForeignKey("self", blank=True, null=True, on_delete=models.SET_NULL, related_name="invalidated_by")
     upvotes = models.PositiveIntegerField(default=0)
     downvotes = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
